@@ -199,6 +199,7 @@ The **Migrations** page provides centralized migration management tools for the 
     :alt: TCM cluster migrations page
 
 Learn more in :ref:`tcm_cluster_migrations`.
+
 ..  _tcm_ui_cluster_tuples:
 
 Tuples
@@ -221,6 +222,25 @@ On this page, you can:
 
 -   view the list of user spaces, their size and engines
 -   view and edit tuples stored in user spaces
+
+..  _tcm_ui_cluster_tcf:
+
+TCF
+~~~
+
+The **TCF** page provides an interface for clusters that run within `Tarantool Clusters Federation <https://www.tarantool.io/en/clustersfederation/>`__.
+
+.. image:: _images/tcm_ui_tcf.png
+    :align: left
+    :width: 700
+    :alt: TCM TCF page
+
+On this page, you can:
+
+-   view information about TCF clusters
+-   switch cluster states in a TCF installation
+
+Learn more in :ref:`tcm_cluster_tcf`.
 
 ..  _tcm_ui_cluster_metrics:
 

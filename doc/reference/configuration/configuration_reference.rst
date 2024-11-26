@@ -1445,7 +1445,11 @@ credentials.users.*
 
 .. confval:: <user_or_role_name>.privileges.lua_call
 
-    Whether this user or a user with this role can call any global user-defined Lua function.
+    A list of global user-defined Lua functions that this user or a user with this role can call.
+    To allow calling all such functions, specify the ``all`` value.
+
+    This option should be configured together with the ``execute``
+    :ref:`permission <configuration_reference_credentials_privileges_permissions>`.
 
 ..  _configuration_reference_credentials_privileges_sql:
 

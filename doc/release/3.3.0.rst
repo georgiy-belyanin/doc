@@ -1,0 +1,374 @@
+Tarantool 3.3
+=============
+
+Release date: November 29, 2024
+
+Releases on GitHub: :tarantool-release:`3.3.0`
+
+The 3.3 release of Tarantool adds the following main product features and improvements for the Community and Enterprise editions:
+
+*   **Community Edition (CE)**
+
+    *   Improvements around queries with offsets.
+    *   Improvement in Raft implementation.
+    *   Persistent replication state.
+    *   New C API for sending work to the TX thread from user threads.
+    *   JSON cluster configuration schema.
+    *   New ``on_event`` callback in application roles.
+    *   API for user-defined alerts.
+    *   Isolated instance mode.
+    *   Automatic instance expulsion.
+    *   New configuration option for Lua memory size.
+
+*   **Enterprise Edition (EE)**
+
+    *   Offset-related improvements in read views.
+    *   Supervised failover improvements.
+
+.. _3-3-features-for-developers:
+
+Developing applications
+-----------------------
+
+.. _3-3-offset:
+
+Improved offset processing
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tarantool 3.3 brings a number of improvements around queries with offsets.
+
+-   The performance of tree index :ref:`select() <box_index-select>` with offset and
+    :ref:`count() <box_index-count>` methods was improved.
+    Previously, the algorithm complexity had a linear dependency on the
+    provided offset size (``O(offset)``) or the number of tuples to count. Now,
+    the new algorithm complexity is ``O(log(size))`` where ``size`` is the number of tuples
+    in the index. This change also eliminates the dependency on the offset value or
+    the number of tuples to count.
+-   The :ref:`index <box_index>` and :ref:`space <box_space>` entities get a new
+    ``offset_of`` method that returns the position relative to the given iterator
+    direction of the tuple that matches the given key.
+
+    .. code-block:: lua
+
+        -- index: {{1}, {3}}
+        index:offset_of({3}, {iterator = 'eq'})  -- returns 1: [1, <3>]
+        index:offset_of({3}, {iterator = 'req'}) -- returns 0: [<3>, 1]
+
+-   The ``offset`` parameter has been added to the :ref:`index:pairs() <box_index-pairs>` method,
+    allowing to skip the first tuples in the iterator.
+
+Same improvements are also introduced to :ref:`read views <read_views>` in the Enterprise Edition.
+
+-   Improved performance of the tree index read view ``select()`` with offset.
+-   A new ``offset_of()`` method of index read views.
+-   A new ``offset`` parameter in the ``index_read_view:pairs()`` method.
+
+.. _3-3-sync-no-timeout:
+
+No rollback on timeout for synchronous transactions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To better match the canonical Raft algorithm design, Tarantool no longer rolls
+back synchronous transactions on timeout (upon reaching :ref:`replication.synchro_timeout <cfg_replication-replication_synchro_timeout>`).
+In the new implementation, transactions can only be rolled back by a new leader after it is elected.
+Otherwise, they can wait for a quorum infinitely.
+
+Given this change in behavior, a new ``replication_synchro_timeout`` :ref:`compat <compat-module>` option is introduced.
+To try the new behavior, set this option to ``new``:
+
+-   In YAML configuration:
+
+    ..  code-block:: yaml
+
+        compat:
+          replication_synchro_timeout: new
+
+-   In Lua code:
+
+    ..  code-block:: tarantoolsession
+
+        tarantool> require('compat').replication_synchro_timeout = 'new'
+        ---
+        ...
+
+There is also a new ``replication.synchro_queue_max_size`` configuration option
+that limits the total size of transactions in the master synchronous queue. The default
+value is 16 megabytes.
+
+.. _3-3-c-api-tx-thread:
+
+C API for sending work to TX thread
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+New public C API functions ``tnt_tx_push()`` and ``tnt_tx_flush()``
+allow to send work to the :ref:`TX thread <thread_model>` from any other thread:
+
+-   ``tnt_tx_push()`` schedules the given callback to be executed with the provided
+    arguments.
+
+-   ``tnt_tx_flush()`` sends all pending callbacks for execution in the TX thread.
+    Execution is started in the same order as the callbacks were pushed.
+
+.. _3-3-json-config-schema:
+
+JSON schema of the cluster configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tarantool cluster configuration schema is now available in the JSON format.
+A schema lists configuration options of a certain Tarantool version with descriptions.
+As of Tarantool 3.3 release date, the following versions are available:
+
+-   `3.0.0 <https://download.tarantool.org/tarantool/schema/config.schema.3.0.0.json>`__
+-   `3.0.1 <https://download.tarantool.org/tarantool/schema/config.schema.3.0.1.json>`__
+-   `3.0.2 <https://download.tarantool.org/tarantool/schema/config.schema.3.0.2.json>`__
+-   `3.1.0 <https://download.tarantool.org/tarantool/schema/config.schema.3.1.0.json>`__
+-   `3.1.1 <https://download.tarantool.org/tarantool/schema/config.schema.3.1.1.json>`__
+-   `3.1.2 <https://download.tarantool.org/tarantool/schema/config.schema.3.1.2.json>`__
+-   `3.2.0 <https://download.tarantool.org/tarantool/schema/config.schema.3.2.0.json>`__
+-   `3.2.1 <https://download.tarantool.org/tarantool/schema/config.schema.3.2.1.json>`__
+-   `3.3.0 <https://download.tarantool.org/tarantool/schema/config.schema.3.3.0.json>`__
+
+Additionally, there is the `latest <https://download.tarantool.org/tarantool/schema/config.schema.json>`__
+schema that reflects the latest configuration schema in development (master branch).
+
+Use these schemas to add code completion for YAML configuration files and get
+hints with option descriptions in your IDE, or validate your configurations,
+for example, with `check-jsonschema <https://pypi.org/project/check-jsonschema/>`__:
+
+.. code-block:: console
+
+    $ check-jsonschema --schemafile https://download.tarantool.org/tarantool/schema/config.schema.3.3.0.json config.yaml
+
+There is also a new API for generating the JSON configuration schema as a Lua table --
+the ``config:jsonschema()`` function.
+
+.. _3-3-roles-on-event:
+
+on_event callbacks in roles
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Now :ref:`application roles <application_roles>` can have ``on_event`` callbacks.
+They are executed every time a ``box.status`` :ref:`system event <system-events>` is
+broadcast or the configuration is updated. The callback has three arguments:
+
+-   ``config`` -- the current configuration.
+-   ``key`` -- an event that has triggered the callback: ``config.apply`` or ``box.status``.
+-   ``value`` -- the value of the ``box.status`` :ref:`system event <system-events>`.
+
+Example:
+
+.. code-block:: lua
+
+    return {
+        name = 'my_role',
+        validate = function() end,
+        apply = function() end,
+        stop = function() end,
+        on_event = function(config, key, value)
+            local log = require('log')
+
+            log.info('on_event is triggered by ' .. key)
+            log.info('is_ro: ' .. value.is_ro)
+            log.info('roles_cfg.my_role.foo: ' .. config.foo)
+        end,
+    }
+
+.. _3-3-alert-api:
+
+API for raising alerts
+~~~~~~~~~~~~~~~~~~~~~~
+
+Now developers can raise their own alerts from their application or application roles.
+For this purpose, a new API is introduced into the ``config`` module.
+
+The ``config:new_alerts_namespace()`` function creates a new
+*alerts namespace* -- a named container for user-defined alerts:
+
+.. code-block:: lua
+
+    local config = require('config')
+    local alerts = config:new_alerts_namespace('my_alerts')
+
+Alerts namespaces provide methods for managing alerts within them. All user-defined
+alerts raised in all namespaces are shown in ``box.info.config.alerts``.
+
+To raise an alert, use the namespace methods ``add()`` or ``set()``:
+The difference between them is that ``set()`` accepts a key to refer to the alert
+later: overwrite or discard it. An alert is a table with one mandatory field ``message``
+(its value is logged) and arbitrary used-defined fields.
+
+.. code-block:: lua
+
+    -- Raise a new alert.
+    alerts:add({
+        message = 'Test alert',
+        my_field = 'my_value',
+    })
+
+    -- Raise a new alert with a key.
+    alerts:set("my_alert", {
+        message = 'Test alert',
+        my_field = 'my_value',
+    })
+
+You can discard alerts individually by keys using the ``unset()`` method, or
+all at once using ``clear()``:
+
+.. code-block:: lua
+
+    alerts:unset("my_alert")
+    alerts:clear()
+
+.. _3-3-administration-and-maintenance:
+
+Administration and maintenance
+------------------------------
+
+.. _3-3-upgrade-ddl:
+
+DDL before upgrade
+~~~~~~~~~~~~~~~~~~~
+
+Since version 3.3, Tarantool allows DDL operations before calling ``box.schema.upgrade()``
+during an upgrade if the source schema version is 2.11.1 or later. This allows,
+for example, granting execute access to user-defined functions in the cluster configuration
+before the schema is upgraded.
+
+.. _3-3-isolated-instances:
+
+Isolated instances
+~~~~~~~~~~~~~~~~~~
+
+A new instance-level configuration option ``isolated`` puts an instance into the
+*isolated* mode. In this mode, an instance doesn't accept updates from other members
+of its replica set and other iproto requests. It also performs no background
+data modifications and remains in read-only mode.
+
+.. code-block:: yaml
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+              instance-002: {}
+              instance-003:
+                isolated: true
+
+Use the isolated mode to temporarily isolate instances for maintenance, debugging,
+or other actions that should not affect other cluster instances.
+
+.. _3-3-autoexpel:
+
+Automatic expulsion of removed instances
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new configuration section ``replication.autoexpel`` allows to automatically expel
+instances after they are removed from the YAML configuration.
+
+.. code-block:: yaml
+
+    replication:
+      autoexpel:
+        enabled: true
+        by: prefix
+        prefix: '{{ replicaset_name }}'
+
+The section includes three options:
+
+-   ``enabled``: whether automatic expulsion logic is enabled in the cluster.
+-   ``by``: a criterion for selecting instances that can be expelled automatically.
+    In version 3.3, the only available criterion is ``prefix``.
+-   ``prefix``: a prefix with which an instance name should start to make automatic expulsion possible.
+
+
+.. _3-3-lua-memory-size:
+
+Lua memory size
+~~~~~~~~~~~~~~~
+
+A new configuration option ``lua.memory`` specifies the maximum amount of memory
+for Lua scripts execution, in bytes. For example, this configuration sets the Lua memory
+limit to 4 GB:
+
+.. code-block:: yaml
+
+    lua:
+      memory: 4294967296
+
+The default limit is 2 GB.
+
+.. _3-3-supervised-failover-improvements:
+
+Supervised failover improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tarantool 3.3 is receiving a number of supervised failover improvements:
+
+*   Support for Tarantool-based :ref:`stateboard <supervised_failover_overview_fault_tolerance>`
+    as an alternative to etcd.
+*   Instance priority configuration: new ``failover.priority`` configuration section.
+    This section specify the instances' relative order of being appointed by a coordinator:
+    bigger values mean higher priority.
+
+    .. code-block:: yaml
+
+        failover:
+          replicasets:
+            replicaset-001:
+              priority:
+                instance-001: 5
+                instance-002: -5
+                instance-003: 4
+
+    Additionally, there is a ``failover.learners`` section that lists instances
+    that should never be appointed as replica set leaders:
+
+    .. code-block:: yaml
+
+        failover:
+          replicasets:
+            replicaset-001:
+              learners:
+                - instance-004
+                - instance-005
+
+*   Automatic failover configuration update.
+*   Failover logging configuration with new configuration options ``failover.log.to``
+    and ``failover.log.file``:
+
+    .. code-block:: yaml
+
+        failover:
+          log:
+            to: file # or stderr
+            file: var/log/tarantool/failover.log
+
+Learn more about supervised failover in :ref:`repl_supervised_failover`.
+
+
+.. _3-3-persistent-wal-gc:
+
+Persistent replication state
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tarantool :ref:`persistence mechanism <concepts-data_model-persistence>` uses
+two types of files: snapshots and write-ahead log (WAL) files. These files are also used
+for replication: read-only replicas receive data changes from the replica set leader
+by reading these files.
+
+The :ref:`garbage collector <configuration_persistence_garbage_collector>`
+cleans up obsolete snapshots and WAL files, but it doesn't remove the files while they
+are in use for replication. To make such a check possible, the replica set leaders
+store the replication state in connection with files. However, this information
+was not persisted, which could lead to issues in case of the leader restart.
+The garbage collector could delete WAL files after the restart even if there were
+replicas that still read these files. The :ref:`wal.cleanup_delay <configuration_reference_wal_cleanup_delay>`
+configuration option was used to prevent such situations.
+
+Since version 3.3, leader instances persist the information about WAL files in use
+in a new system space ``_gc_consumers``. After a restart, the replication state
+is restored, and WAL files needed for replication are protected from garbage collection.
+This eliminates the need to keep all WAL files after a restart, so the ``wal.cleanup_delay``
+option is now deprecated.

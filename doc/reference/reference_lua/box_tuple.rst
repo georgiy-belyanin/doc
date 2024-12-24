@@ -47,6 +47,9 @@ Below is a list of all ``box.tuple`` functions.
         *  - :doc:`./box_tuple/find`
            - Get the number of the first field/all fields matching the search value
 
+        *  - :doc:`./box_tuple/format`
+           - Get the format of a tuple
+
         *  - :doc:`./box_tuple/info`
            - Get information about the tuple
 
@@ -85,6 +88,7 @@ Below is a list of all ``box.tuple`` functions.
     box_tuple/field_name
     box_tuple/field_path
     box_tuple/find
+    box_tuple/format
     box_tuple/info
     box_tuple/next
     box_tuple/pairs

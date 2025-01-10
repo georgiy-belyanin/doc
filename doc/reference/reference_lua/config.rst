@@ -63,19 +63,28 @@ API Reference
         *   -   **config.storage API**
             -
 
-        *   -   :ref:`config.storage.put() <config_storage_api_reference_put>`
+        *   -   :ref:`config.storage <config_storage_api_reference>`
+            -   Server API for interacting with config.storage clusters
+
+        *   -   :ref:`config.storage_client <config_storage_client_api_reference>`
+            -   Client API for interacting with config.storage clusters
+
+        *   -   :ref:`config.storage_client:connect() <config_storage_client_api_reference_connect>`
+            -   Connect to a remote config.storage cluster
+
+        *   -   :ref:`<config.storage object>:put() <config_storage_object_api_reference_put>`
             -   Put a value by the specified path
 
-        *   -   :ref:`config.storage.get() <config_storage_api_reference_get>`
+        *   -   :ref:`<config.storage object>:get() <config_storage_object_api_reference_get>`
             -   Get a value stored by the specified path
 
-        *   -   :ref:`config.storage.delete() <config_storage_api_reference_delete>`
+        *   -   :ref:`<config.storage object>:delete() <config_storage_object_api_reference_delete>`
             -   Delete a value stored by the specified path
 
-        *   -   :ref:`config.storage.info() <config_storage_api_reference_info>`
+        *   -   :ref:`<config.storage object>:info() <config_storage_object_api_reference_info>`
             -   Get information about an instance's connection state
 
-        *   -   :ref:`config.storage.txn() <config_storage_api_reference_txn>`
+        *   -   :ref:`<config.storage object>:txn() <config_storage_object_api_reference_txn>`
             -   Make an atomic request
 
 
@@ -351,178 +360,261 @@ config API
 config.storage API
 ~~~~~~~~~~~~~~~~~~
 
-The ``config.storage`` API allows you to interact with a Tarantool-based :ref:`centralized configuration storage <configuration_etcd>`.
+    The ``config.storage`` and ``config.storage_client`` API allows you to interact with Tarantool-based :ref:`centralized configuration storage <configuration_etcd>`.
 
-.. module:: config.storage
+.. _config_storage_api_reference:
 
-.. _config_storage_api_reference_put:
+.. class:: config.storage
 
-.. function:: put(path, value)
+    If you :ref:`configure a replicaset as Tarantool-based centralized configuration storage <centralized_configuration_storage_tarantool_configure>` by specifying a ``config.storage`` role (see :ref:`configuring roles <configuration_reference_roles>`) the ``config.storage`` object provides :ref:`config_storage_object` methods to interact with a key-value storage, see Server API examples below.
 
-    Put a value by the specified path.
+.. _config_storage_client_api_reference:
 
-    :param string path: a path to put the value by
-    :param string value: a value to put
+.. class:: config.storage_client
 
-    :return:    a table containing the following fields:
+The ``config.stoarge_client`` API allows you to connect to a remote replica set :ref:`configured as a Tarantool-based centralized configuration storage <centralized_configuration_set_up_tarantool>` and interact with it as a key-value storage, see Client API examples below.
 
-                *   ``revision``: a revision after performing the operation
+If a config.storage config source is configured the ``config.storage_client` provides :`config_storage_object` methods to interact with a remote centralized configuration storage.
 
-    :rtype: table
+.. _config_storage_client_api_reference_connect:
 
-    **Example:**
+.. function:: connect(endpoints[, options])
 
-    The example below shows how to read a configuration stored in the ``source.yaml`` file using the :ref:`fio module <fio-module>` API and put this configuration by the ``/myapp/config/all`` path:
+    Connect to a remote config.storage cluster.
 
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-after: function put_config
-        :end-at: cluster_config_handle:close()
-        :dedent:
+    :param table endpoints: a path to put the value by
+    :param table options: extra options
 
-    Example on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
-
-
-.. _config_storage_api_reference_get:
-
-.. function:: get(path)
-
-    Get a value stored by the specified path or prefix.
-
-    :param string path: a path or prefix to get a value by; prefixes end with ``/``
-
-    :return:    a table containing the following fields:
-
-                *   ``data``: a table containing the information about the value:
-
-                    * ``path``: a path
-                    * ``mod_revision``: the last revision at which this value was modified
-                    * ``value:``: a value
-
-                *   ``revision``: a revision after performing the operation
+    :return:    a <config.storage object> object
 
     :rtype: table
 
-    **Examples:**
+.. _config_storage_object_api_reference:
 
-    The example below shows how to get a configuration stored by the ``/myapp/config/all`` path:
+.. class:: config_storage_object
 
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-after: get_config_by_path
-        :end-at: get('/myapp/config/all')
-        :dedent:
+    .. _config_storage_object_api_reference_put:
 
-    This example shows how to get all configurations stored by the ``/myapp/`` prefix:
+    .. method:: put(path, value)
 
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-after: get_config_by_prefix
-        :end-at: get('/myapp/')
-        :dedent:
+        Put a value by the specified path.
 
-    Example on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
+        :param string path: a path to put the value by
+        :param string value: a value to put
 
-.. _config_storage_api_reference_delete:
+        :return:    a table containing the following fields:
 
-.. function:: delete(path)
+                    *   ``recvision``: a revision after performing the operation
 
-    Delete a value stored by the specified path or prefix.
+        :rtype: table
 
-    :param string path: a path or prefix to delete the value by; prefixes end with ``/``
+        **Server API example:**
 
-    :return:    a table containing the following fields:
+        The example below shows how to read a configuration stored in the ``source.yaml`` file using the :ref:`fio module <fio-module>` API and put this configuration by the ``/myapp/config/all`` path:
 
-                *   ``data``: a table containing the information about the value:
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-after: function put_config
+            :end-at: cluster_config_handle:close()
+            :dedent:
 
-                    * ``path``: a path
-                    * ``mod_revision``: the last revision at which this value was modified
-                    * ``value:``: a value
+        **Client API exapmle:**
 
-                *   ``revision``: a revision after performing the operation
+        The example below shows how to read a configuration stored in the ``source.yaml`` file using the :ref:`fio module <fio-module>` API and put this configuration by the ``/myapp/config/all`` path:
 
-    :rtype: table
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-after: function put_config
+            :end-at: cluster_config_handle:close()
+            :dedent:
 
-    **Examples:**
-
-    The example below shows how to delete a configuration stored by the ``/myapp/config/all`` path:
-
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-after: delete_config
-        :end-at: delete('/myapp/config/all')
-        :dedent:
-
-    In this example, all configuration are deleted:
-
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-after: delete_all_configs
-        :end-at: delete('/')
-        :dedent:
-
-    Example on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
+        Examples on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
 
 
-.. _config_storage_api_reference_info:
+    .. _config_storage_object_api_reference_get:
 
-.. function:: info()
+    .. method:: get(path)
 
-    Get information about an instance's connection state.
+        Get a value stored by the specified path or prefix.
 
-    :return:    a table containing the following fields:
+        :param string path: a path or prefix to get a value by; prefixes end with ``/``
 
-                *   ``status``: a connection status, which can be one of the following:
+        :return:    a table containing the following fields:
 
-                    * ``connected``: if any instance from the quorum is available to the current instance
-                    * ``disconnected``: if the current instance doesn't have a connection with the quorum
+                    *   ``data``: a table containing the information about the value:
 
-    :rtype: table
+                        * ``path``: a path
+                        * ``mod_revision``: the last revision at which this value was modified
+                        * ``value:``: a value
+
+                    *   ``revision``: a revision after performing the operation
+
+        :rtype: table
+
+        **Server API examples:**
+
+        The example below shows how to get a configuration stored by the ``/myapp/config/all`` path:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-after: get_config_by_path
+            :end-at: get('/myapp/config/all')
+            :dedent:
+
+        This example shows how to get all configurations stored by the ``/myapp/`` prefix:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-after: get_config_by_prefix
+            :end-at: get('/myapp/')
+            :dedent:
+
+        **Client API examples:**
+
+        The example below shows how to get a configuration stored by the ``/myapp/config/all`` path on a remote config.storage cluster:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-after: get_config_by_path
+            :end-at: get('/myapp/config/all')
+            :dedent:
+
+        This example shows how to get all configurations stored by the ``/myapp/`` prefix on a remote config.storage cluster:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-after: get_config_by_prefix
+            :end-at: get('/myapp/')
+            :dedent:
+
+        Examples on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
+
+    .. _config_storage_object_api_reference_delete:
+
+    .. method:: delete(path)
+
+        Delete a value stored by the specified path or prefix.
+
+        :param string path: a path or prefix to delete the value by; prefixes end with ``/``
+
+        :return:    a table containing the following fields:
+
+                    *   ``data``: a table containing the information about the value:
+
+                        * ``path``: a path
+                        * ``mod_revision``: the last revision at which this value was modified
+                        * ``value:``: a value
+
+                    *   ``revision``: a revision after performing the operation
+
+        :rtype: table
+
+        **Server API examples:**
+
+        The example below shows how to delete a configuration stored by the ``/myapp/config/all`` path:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-after: delete_config
+            :end-at: delete('/myapp/config/all')
+            :dedent:
+
+        In this example, all configuration are deleted:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-after: delete_all_configs
+            :end-at: delete('/')
+            :dedent:
+
+        **Client API examples:**
+
+        The example below shows how to delete a configuration stored by the ``/myapp/config/all`` path:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-after: delete_config
+            :end-at: delete('/myapp/config/all')
+            :dedent:
+
+        In this example, all configuration are deleted:
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-after: delete_all_configs
+            :end-at: delete('/')
+            :dedent:
+
+        Examples on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
 
 
-.. _config_storage_api_reference_txn:
+    .. _config_storage_object_api_reference_info:
 
-.. function:: txn(request)
+    .. method:: info()
 
-    Make an atomic request.
+        Get information about an instance's connection state.
 
-    :param table request:   a table containing the following optional fields:
+        :return:    a table containing the following fields:
 
-                            *   ``predicates``: a list of predicates to check. Each predicate is a list that contains:
+                    *   ``status``: a connection status, which can be one of the following:
 
-                                .. code-block:: none
+                        * ``connected``: if any instance from the quorum is available to the current instance
+                        * ``disconnected``: if the current instance doesn't have a connection with the quorum
 
-                                    {target, operator, value[, path]}
+        :rtype: table
 
-                                *   ``target`` -- one of the following string values: ``revision``, ``mod_revision``, ``value``, ``count``
-                                *   ``operator`` -- a string value: ``eq``, ``ne``, ``gt``, ``lt``, ``ge``, ``le`` or its symbolic equivalent, for example, ``==``, ``!=``, ``>``
-                                *   ``value`` -- an unsigned or string value to compare
-                                *   ``path`` (optional) -- a string value: can be a path with the ``mod_revision`` and ``value`` target or a path/prefix with the ``count`` target
 
-                            * ``on_success``: a list with operations to execute if all predicates in the list evaluate to ``true``
+    .. _config_storage_object_api_reference_txn:
 
-                            * ``on_failure``: a list with operations to execute if any of a predicate evaluates to ``false``
+    .. method:: txn(request)
 
-    :return:    a table containing the following fields:
+        Make an atomic request.
 
-                *   ``data``: a table containing response data:
+        :param table request:   a table containing the following optional fields:
 
-                    * ``responses``: the list of responses for all operations
-                    * ``is_success``: a boolean value indicating whether the predicate is evaluated to ``true``
+                                *   ``predicates``: a list of predicates to check. Each predicate is a list that contains:
 
-                *   ``revision``: a revision after performing the operation
+                                    .. code-block:: none
 
-    :rtype: table
+                                        {target, operator, value[, path]}
 
-    **Example:**
+                                    *   ``target`` -- one of the following string values: ``revision``, ``mod_revision``, ``value``, ``count``
+                                    *   ``operator`` -- a string value: ``eq``, ``ne``, ``gt``, ``lt``, ``ge``, ``le`` or its symbolic equivalent, for example, ``==``, ``!=``, ``>``
+                                    *   ``value`` -- an unsigned or string value to compare
+                                    *   ``path`` (optional) -- a string value: can be a path with the ``mod_revision`` and ``value`` target or a path/prefix with the ``count`` target
 
-    ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
-        :language: lua
-        :start-at: config.storage.txn
-        :end-at: })
-        :dedent:
+                                * ``on_success``: a list with operations to execute if all predicates in the list evaluate to ``true``
 
-    Example on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
+                                * ``on_failure``: a list with operations to execute if any of a predicate evaluates to ``false``
+
+        :return:    a table containing the following fields:
+
+                    *   ``data``: a table containing response data:
+
+                        * ``responses``: the list of responses for all operations
+                        * ``is_success``: a boolean value indicating whether the predicate is evaluated to ``true``
+
+                    *   ``revision``: a revision after performing the operation
+
+        :rtype: table
+
+        **Server API example:**
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp.lua
+            :language: lua
+            :start-at: config.storage.txn
+            :end-at: })
+            :dedent:
+
+        **Client API example:**
+
+        ..  literalinclude:: /code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage/myapp_client.lua
+            :language: lua
+            :start-at: config.storage.txn
+            :end-at: })
+            :dedent:
+
+        Examples on GitHub: `tarantool_config_storage <https://github.com/tarantool/doc/tree/latest/doc/code_snippets/snippets/centralized_config/instances.enabled/tarantool_config_storage>`_
 
 .. toctree::
     :maxdepth: 1
